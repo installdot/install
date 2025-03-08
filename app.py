@@ -35,19 +35,23 @@ def clear_screen():
     os.system("clear")
 
 def get_running_roblox_packages():
-    """Fetch running Roblox instances with package names like com.roblox.clienX."""
+    """Fetch running Roblox instances, optimized for floating apps."""
     try:
-        # Get all running processes with "roblox"
-        output = subprocess.getoutput("ps -A | grep roblox")
-        
-        if not output.strip():
-            return []  # No running processes found
-
+        # Use dumpsys to find active Roblox instances
+        output = subprocess.getoutput("dumpsys activity activities | grep com.roblox.clien")
         packages = set()
+
         for line in output.splitlines():
             match = re.search(r'\b(com\.roblox\.clien[a-zA-Z0-9])\b', line)
             if match:
                 packages.add(match.group(1))
+
+        # Fallback: Use pidof for detection
+        if not packages:
+            for char in "abcdefghijklmnopqrstuvwxyz0123456789":
+                package = f"com.roblox.clien{char}"
+                if subprocess.getoutput(f"pidof {package}").strip():
+                    packages.add(package)
 
         return list(packages)
     except Exception:
