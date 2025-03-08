@@ -2,12 +2,13 @@ import os
 import time
 import random
 import subprocess
+import re
 
 # Ensure necessary packages are installed
 def install_requirements():
     os.system("pkg update -y")
-    os.system("pkg install proot -y")  # Ensures proper process handling
-    os.system("pkg install grep -y")   # Required for process filtering
+    os.system("pkg install proot -y")
+    os.system("pkg install grep -y")
 
 install_requirements()  # Run the installation
 
@@ -25,7 +26,7 @@ GAME_IDS = [
 ]
 
 FINAL_GAME_ID = "2753915549"  # Blox Fruits
-CYCLE_TIME = 60  # 5 minutes per game
+CYCLE_TIME = 300  # 5 minutes per game
 CHECK_INTERVAL = 10  # Check instances every 10 seconds
 BLOX_FRUITS_REJOIN_TIME = 1200  # 20 minutes
 
@@ -34,16 +35,19 @@ def clear_screen():
     os.system("clear")
 
 def get_running_roblox_packages():
-    """Fetch all running Roblox instances with package names like com.roblox.clien?"""
+    """Fetch running Roblox instances with package names like com.roblox.clienX."""
     try:
-        output = subprocess.getoutput("ps -A | grep com.roblox.clien")
-        packages = set()
+        # Get all running processes with "roblox"
+        output = subprocess.getoutput("ps -A | grep roblox")
+        
+        if not output.strip():
+            return []  # No running processes found
 
+        packages = set()
         for line in output.splitlines():
-            parts = line.split()
-            for part in parts:
-                if part.startswith("com.roblox.clien"):  # More reliable detection
-                    packages.add(part)
+            match = re.search(r'\b(com\.roblox\.clien[a-zA-Z0-9])\b', line)
+            if match:
+                packages.add(match.group(1))
 
         return list(packages)
     except Exception:
@@ -120,8 +124,8 @@ def rotate_games():
                 print(f"Instance {idx}: Running")
             else:
                 print(f"Instance {idx}: Stopped! Restarting...")
-                restart_instance(instance)  # Restart the instance if it crashed
-                time.sleep(5)  # Wait before relaunching
+                restart_instance(instance)
+                time.sleep(5)
                 launch_game(instance, FINAL_GAME_ID)
 
         # Auto rejoin Blox Fruits every 20 minutes
