@@ -4,17 +4,16 @@ import requests
 import os
 import threading
 import sys
-import select
 
 GAME_IDS = [
     "3101667897",  # Legends Of Speed
     "7041939546",  # Catalog Avatar Creator
-    "18853192637",  # Pet Mine
-    "17625359962",  # RIVALS
-    "116495829188952",  # Dead Rails Alpha
-    "18994560526",  # Realistic Anime Outfits
-    "6872265039",  # CTF BedWars
-    "132903971646556",  # Kivotos TD
+    "18853192637", # Pet Mine
+    "17625359962", # RIVALS
+    "116495829188952", # Dead Rails Alpha
+    "18994560526", # Realistic Anime Outfits
+    "6872265039", # CTF BedWars
+    "132903971646556", # Kivotos TD
     "16732694052"
 ]
 
@@ -22,9 +21,10 @@ BLOX_FRUIT_ID = "2753915549"
 TELEGRAM_BOT_TOKEN = "7714379995:AAEknOKKMUv8dSYBLKtCppH5JVfFPuGfwJY"
 TELEGRAM_CHAT_ID = "7193275860"
 MESSAGE_ID = ""
-STATUS = "Starting..."
-CURRENT_ID = ""
-NEXT_ID = ""
+
+current_id = None
+next_id = None
+time_left = 300
 
 def install_requirements():
     try:
@@ -89,51 +89,40 @@ def rainbow_text(text):
         color_index = (color_index + 1) % len(colors)
     print()
 
-def display_ui(packages, ip, status, current_id, next_id, time_left=0):
+def display_ui(status, instance_count):
     os.system("clear")
     rainbow_text("Creator: Trần Hải")
+    ip = get_ip()
     print(f"IP: {ip}")
     print(f"Status: {status}")
-    if status == "Seeding":
-        print(f"Current ID: {current_id}")
-        print(f"Next ID: {next_id}")
-        print(f"Time left: {time_left} seconds")
-        print("Options:")
-        print("1. Skip 1 game")
-        print("2. Skip all (Blox Fruit)")
-    elif status == "Running":
-        instance_count = 1
-        for package in packages:
-            output = run_shell_command(f"pm list packages | grep '{package}'")
-            if package in output:
-                print(f"Instance {instance_count}: Running")
-            else:
-                print(f"Instance {instance_count}: Stopped")
-            instance_count += 1
-        print("Options:")
-        print("1. Rejoin Single (Choose 1 instance)")
-        print("2. Rejoin All")
+    for i in range(1, instance_count + 1):
+        print(f"Instance {i}: Running")
 
 def run_games():
-    global STATUS, CURRENT_ID, NEXT_ID
+    global current_id, next_id, time_left
+
     packages = find_roblox_packages()
     if not packages:
         print(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - No Roblox packages found.")
         return
 
-    ip = get_ip()
-    game_index = 0
-    while game_index < len(GAME_IDS):
-        CURRENT_ID = GAME_IDS[game_index -1] if game_index > 0 else ""
-        NEXT_ID = GAME_IDS[game_index]
-        time_left = 300
-        STATUS = "Seeding"
+    current_id = None
+    next_id = ""
+    time_left = 300
 
-        display_ui(packages, ip, STATUS, CURRENT_ID, NEXT_ID, time_left)
+    for game_id in GAME_IDS:
+        current_id = next_id
+        next_id = game_id
+        time_left = 300
+
+        display_ui("Seeding", len(packages))
+        print(f"Current ID: {current_id}")
+        print(f"Next ID: {next_id}")
+        print(f"Time left: {time_left} seconds")
 
         threads = []
         for package in packages:
-            thread = threading.Thread(target=open_roblox_url, args=(package, GAME_IDS[game_index]))
+            thread = threading.Thread(target=open_roblox_url, args=(package, game_id))
             threads.append(thread)
             thread.start()
 
@@ -141,34 +130,34 @@ def run_games():
             thread.join()
 
         while time_left > 0:
-            display_ui(packages, ip, STATUS, CURRENT_ID, NEXT_ID, time_left)
-            rlist, _, _ = select.select([sys.stdin], [], [], 1)
-            if rlist:
-                choice = sys.stdin.readline().strip()
-                if choice == "1":
-                    game_index += 1
-                    break
-                elif choice == "2":
-                    return
             time.sleep(1)
             time_left -= 1
-        game_index += 1
+            display_ui("Seeding", len(packages))
+            print(f"Current ID: {current_id}")
+            print(f"Next ID: {next_id}")
+            print(f"Time left: {time_left} seconds")
+
+        choice = input("\n1. Skip 1 game\n2. Skip all (skip to Blox Fruit)\nChoose an option: ")
+        if choice == "1":
+            continue
+        elif choice == "2":
+            break
+
+    os.system("clear")
 
 def run_blox_fruit():
-    global STATUS
     packages = find_roblox_packages()
     if not packages:
         print(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - No Roblox packages found.")
         return
 
     ip = get_ip()
-    STATUS = "Running"
+    instances = packages
 
     while True:
-        display_ui(packages, ip, STATUS, "", "")
-        message = f"IP: {ip}\nStatus: Running\n"
+        message = f"IP: {ip}\n"
         instance_count = 1
-        for package in packages:
+        for package in instances:
             output = run_shell_command(f"pm list packages | grep '{package}'")
             if package in output:
                 message += f"Instance {instance_count}: Running\n"
@@ -182,12 +171,16 @@ def run_blox_fruit():
         else:
             edit_telegram_message(message)
 
-        rlist, _, _ = select.select([sys.stdin], [], [], 5)
-        if rlist:
-            choice = sys.stdin.readline().strip()
-            if choice == "1":
-                print("Enter Instance Number to Rejoin:")
-                instance_num = int(sys.stdin.readline().strip()) -1
-                if 0 <= instance_num < len(packages):
-                    threading.Thread(target=open_roblox_url, args=(packages[instance_num], BLOX_FRUIT_ID)).start()
-            elif choice == "2":
+        print(f"IP: {ip}")
+        print("Status: Running")
+        instance_choice = input("\n1. Rejoin Single (choose instance to rejoin)\n2. Rejoin All\nChoose an option: ")
+        if instance_choice == "1":
+            instance_number = int(input("Choose instance number to rejoin: "))
+            open_roblox_url(instances[instance_number - 1], BLOX_FRUIT_ID)
+        elif instance_choice == "2":
+            for instance in instances:
+                open_roblox_url(instance, BLOX_FRUIT_ID)
+        time.sleep(5)
+
+run_games()
+run_blox_fruit()
