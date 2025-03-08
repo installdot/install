@@ -2,7 +2,6 @@ import os
 import time
 import random
 import subprocess
-import re
 
 # List of 9 game IDs (to be played before Blox Fruits)
 GAME_IDS = [
@@ -38,7 +37,7 @@ def get_roblox_instances():
 def open_roblox_instances(instances):
     """Open all detected Roblox instances."""
     for package in instances:
-        os.system(f"monkey -p {package} -c android.intent.category.LAUNCHER 1")
+        os.system(f"am start -n {package}/com.roblox.client")
         time.sleep(2)  # Give time for each instance to launch
 
 def launch_game(package, game_id):
